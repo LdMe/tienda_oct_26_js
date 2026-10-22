@@ -49,6 +49,12 @@ class Shop {
     getProducts(){
         return Array.from(this.inventory.values())
     }
+    getCategories(){
+        const products = this.getProducts();
+        const categories = Array.from(new Set(products.map(entry=>entry.product.category)));
+        return categories;
+
+    }
 
 }
 

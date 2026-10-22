@@ -4,7 +4,7 @@ import data from "./data/products.json" with { type: "json" };
 import { Client } from "./core/User.js";
 import Cart from "./core/Cart.js";
 import Paginator from "./ui/paginator.js";
-import { createProductArticle } from "./ui/renderer.js";
+import { createProductArticle,renderFilterForm} from "./ui/renderer.js";
 
 
 const shop = new Shop("tienda pruebas");
@@ -12,6 +12,10 @@ const shop = new Shop("tienda pruebas");
 
 const products = data.products.map(p => Product.fromJson(p));
 products.forEach(p=>shop.addProduct(p,5));
+
+const categories = shop.getCategories();
+
+renderFilterForm("search-menu",categories)
 
 console.log(products.length)
 const paginator = new Paginator("product__list",products,createProductArticle,10,true)
