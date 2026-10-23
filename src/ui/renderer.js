@@ -1,33 +1,34 @@
 
 
-function createProductArticle({ id, title, price, image, description }) {
-
+function createProductArticle(productEntry) {
+    const product = productEntry.product;
+    const stock = productEntry.stock;
     const article = document.createElement("article");
     article.classList.add("product", "product-card");
-    article.dataset.productId = id;
+    article.dataset.productId = product.id;
 
     const productTitle = document.createElement("h3");
-    productTitle.textContent = title;
+    productTitle.textContent = product.title;
     productTitle.classList.add("product__title");
 
     const productImage = document.createElement("img");
-    productImage.setAttribute("src", image);
-    productImage.setAttribute("alt", `image of ${title}`);
+    productImage.setAttribute("src", product.image);
+    productImage.setAttribute("alt", `image of ${product.title}`);
 
     const productPrice = document.createElement("p");
-    productPrice.textContent = price + "€";
+    productPrice.textContent = product.getPriceEuro();
 
     const productDescription = document.createElement("p");
-    productDescription.textContent = description;
+    productDescription.textContent = product.description;
+
+    const productStock = document.createElement("p");
+    productStock.textContent= "stock: "+stock;
 
     const productButton = document.createElement("button");
-    productButton.textContent = "Me gusta";
+    productButton.textContent = "Buy";
+    productButton.classList.add("buy-button");
 
-    productButton.addEventListener("click", () => {
-        alert(`Te gusta ${title} con id ${id}`);
-    })
-
-    article.append(productImage, productTitle, productDescription, productPrice, productButton);
+    article.append(productImage, productTitle, productDescription, productPrice, productStock, productButton);
     return article;
 
 }
@@ -72,7 +73,55 @@ function renderFilterForm(sectionId, categories) {
 
 }
 
+function renderCart(cartSectionId,cart){
+    
+    const cartSection = document.getElementById(cartSectionId);
+    const totalProducts = cart.getTotalQuantity();
+    cartSection.innerText = `🛒${totalProducts}`; 
+    cartSection.addEventListener("click",()=>{
+        renderCartData("cart",cart);
+    })  
+
+}
+
+function renderProductInCart(cartEntry){
+
+    const article = document.createElement("article");
+    article.classList.add("product-line");
+
+    const productTitle = document.createElement("h3");
+    productTitle.textContent = cartEntry.product.title;
+
+    const productImage = document.createElement("img");
+    productImage.setAttribute("src",cartEntry.product.image);
+
+    const quantity = document.createElement("p");
+    quantity.textContent="X"+cartEntry.quantity;
+
+    const subtotal = document.createElement("p");
+    subtotal.textContent = cartEntry.quantity * cartEntry.price;
+
+    article.append(productTitle,productImage,quantity,subtotal);
+    return article;
+
+
+}
+function renderCartData(cartSectionId,cart){
+    const lines = cart.getLines();
+    const linesHTML = lines.map(l => renderProductInCart(l));
+    const cartSection = document.getElementById(cartSectionId)
+    cartSection.replaceChildren();
+    cartSection.append(...linesHTML);
+    
+    const total = document.createElement("p");
+    total.classList.add("total");
+    total.textContent = `Total: ${cart.getTotalPrice()}`
+    cartSection.append(total)
+    console.log(lines);
+}
+
 export {
     createProductArticle,
-    renderFilterForm
+    renderFilterForm,
+    renderCart
 }

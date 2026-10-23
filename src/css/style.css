@@ -17,6 +17,26 @@
     }
 }
 
+.product-line {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid black;
+    img{
+        height:4rem;
+        width: 4rem;
+    }
+    h3{
+        width:30%;
+    }
+    
+}
+
+.total {
+    font-weight: bolder;
+    text-align: end;
+}
+
+
 @media (min-width:760px) {
     #product__list{
         flex-direction: row;
