@@ -1,14 +1,14 @@
 # Memoria técnica — Tienda
 
-> Versión 1.0 · Fases 1 (modelo), 2 (DOM) y diseño de la fase 3 (API) · Octubre 2026
+> Versión 1.1 · Proyecto completo: fases 1 (modelo), 2 (DOM) y 3 (API + `localStorage`) · Octubre 2026
 
 ---
 
 ## 1. Descripción del proyecto
 
-Aplicación web de comercio electrónico. Un **cliente** puede consultar el catálogo paginado, buscar productos por texto, filtrarlos por categoría y añadirlos a su carrito, que respeta el stock disponible y muestra el total en euros.
+Aplicación web de comercio electrónico. Un **cliente** puede consultar el catálogo paginado, buscar productos por texto, filtrarlos por categoría y añadirlos a su carrito, que respeta el stock disponible, muestra el total en euros y **se conserva al recargar la página**.
 
-El catálogo procede de la API pública **DummyJSON**. Durante las fases 1 y 2 se usa una copia local de sus datos (`data/products.json`) con el mismo formato que la API; la sección 8 describe cómo se sustituye por la llamada real.
+El catálogo se carga de la API pública **DummyJSON** (sección 8). Cada versión conserva una copia local de los datos (`data/products.json`, con el mismo formato que la API) para poder trabajar sin conexión. El carrito se guarda en `localStorage` (sección 9).
 
 La aplicación se entrega en **tres versiones** que hacen lo mismo con distinta organización del código (`sencilla/`, `v1/`, `v2/`), para poder estudiar la misma solución con distintos niveles de abstracción. Se describen en la sección 7.
 
@@ -19,6 +19,8 @@ La aplicación se entrega en **tres versiones** que hacen lo mismo con distinta 
 - Paginar y filtrar una lista de datos.
 - Separar la **lógica de negocio** (clases del modelo) de la **presentación** (DOM) y del **acceso a datos** (JSON / API).
 - Entender la diferencia entre **paginar en el cliente** y **paginar en el servidor**.
+- Consumir una API con `fetch`, `async` / `await` y gestionar los errores de red.
+- Guardar y recuperar datos en `localStorage`, reconstruyendo los objetos de nuestras clases.
 
 ### 1.2 Alcance
 
@@ -26,9 +28,9 @@ La aplicación se entrega en **tres versiones** que hacen lo mismo con distinta 
 |---|---|
 | Catálogo paginado con imagen, precio y stock | Pasarela de pago real |
 | Búsqueda por texto y filtro por categoría | Registro / login real (el cliente está simulado) |
-| Carrito con control de stock y total | Pedidos, checkout e historial (ver ampliaciones, §11) |
-| Carga del catálogo desde la API (fase 3) | Backend propio y base de datos |
-| | Gestión de stock por trabajadores (ver ampliaciones, §11) |
+| Carrito con control de stock, total, quitar unidades y vaciar | Pedidos, checkout e historial (ver ampliaciones, §12) |
+| Carga del catálogo desde la API, con mensajes de carga y error | Backend propio y base de datos |
+| Carrito guardado en `localStorage` | Gestión de stock por trabajadores (ver ampliaciones, §12) |
 
 ---
 
@@ -37,7 +39,7 @@ La aplicación se entrega en **tres versiones** que hacen lo mismo con distinta 
 | Actor | Descripción |
 |---|---|
 | **Cliente** | Usuario que navega por el catálogo y añade productos a su carrito. En la aplicación hay un único cliente simulado, creado en `index.js`. |
-| **Sistema / API** | Fuente del catálogo (DummyJSON). En las fases 1 y 2, una copia local en `data/products.json`. |
+| **Sistema / API** | Fuente del catálogo (DummyJSON). Sin conexión, una copia local en `data/products.json`. |
 
 ---
 
@@ -58,15 +60,19 @@ La aplicación se entrega en **tres versiones** que hacen lo mismo con distinta 
 | RF-09 | Impedir añadir más unidades de las que hay en stock, avisando al usuario | Alta | ✅ Hecho |
 | RF-10 | Mostrar el número de artículos del carrito en un botón | Alta | ✅ Hecho |
 | RF-11 | Mostrar/ocultar el detalle del carrito: líneas, cantidades, subtotales y total | Alta | ✅ Hecho |
-| RF-12 | Cargar el catálogo desde la API de DummyJSON | Alta | 📐 Diseñado (§8), se implementa en la fase 3 |
-| RF-13 | Mostrar un mensaje mientras se cargan los datos de la API | Media | 📐 Diseñado (§8), se implementa en la fase 3 |
+| RF-12 | Cargar el catálogo desde la API de DummyJSON | Alta | ✅ Hecho |
+| RF-13 | Mostrar un mensaje mientras se cargan los datos de la API | Media | ✅ Hecho |
+| RF-14 | Mostrar un mensaje si la API no responde | Media | ✅ Hecho |
+| RF-15 | Quitar unidades de un producto desde el carrito (botón −1) | Alta | ✅ Hecho |
+| RF-16 | Vaciar el carrito | Media | ✅ Hecho |
+| RF-17 | Conservar el carrito al recargar la página (`localStorage`) | Media | ✅ Hecho |
 
 ### 3.2 Requisitos no funcionales
 
 | ID | Requisito | Cómo se cumple |
 |---|---|---|
 | RNF-01 | JavaScript vanilla (ES2022+), sin frameworks. | Módulos ES nativos (`import`/`export`), sin dependencias. |
-| RNF-02 | Las clases del modelo no acceden al DOM ni a `fetch`. | `core/` no usa `document` ni `fetch`. El DOM está en `index.js` y `ui/`; los datos, en `index.js` o en `repositories/`. |
+| RNF-02 | Las clases del modelo no acceden al DOM, a `fetch` ni a `localStorage`. | `core/` no usa `document`, `fetch` ni `localStorage`. El DOM está en `index.js` y `ui/`; `fetch`, solo en `api.js`; `localStorage`, solo en `storage.js`. |
 | RNF-03 | Los importes se almacenan como **enteros en céntimos**. | `Product.fromJson()` convierte con `Math.round(price * 100)`. `formatPrice()` los muestra como `19.99€`. |
 | RNF-04 | Los datos inválidos se señalan con errores (`throw`), no con `console.log`. | `checkProduct`, `checkClient`, `checkPositiveNumber` lanzan errores propios (`utils/errors.js`). En `v1`/`v2` también `NotEnoughStockError`. |
 | RNF-05 | Código en inglés; documentación y comentarios en español. | Nombres de clases, métodos y variables en inglés. |
@@ -88,6 +94,14 @@ La aplicación se entrega en **tres versiones** que hacen lo mismo con distinta 
   - ✅ "Green Chili Pepper" tiene stock 3: la cuarta pulsación de *Buy* muestra el aviso y el carrito se queda en 3 unidades de ese producto.
 - **HU-05** — *Como cliente, quiero ver cuánto llevo gastado.*
   - ✅ Dos unidades de "Essence Mascara Lash Princess" (9.99 €) muestran 🛒 2 y "Total: 19.98€".
+- **HU-06** — *Como cliente, quiero corregir mi carrito.*
+  - ✅ El botón −1 de una línea quita una unidad; si era la última, la línea desaparece.
+  - ✅ *Empty cart* deja el carrito vacío y muestra "The cart is empty".
+- **HU-07** — *Como cliente, no quiero perder mi carrito si recargo la página.*
+  - ✅ Con 1 máscara y 3 Green Chili Pepper en el carrito, al recargar aparecen 🛒 4 y "Total: 12.96€".
+  - ✅ Si lo guardado está estropeado, la tienda arranca con el carrito vacío en lugar de romperse.
+- **HU-08** — *Como cliente, quiero saber qué pasa si la tienda no carga.*
+  - ✅ Mientras llegan los datos se ve "Loading products..."; si la API no responde, un mensaje de error.
 
 ---
 
@@ -99,10 +113,12 @@ La aplicación se entrega en **tres versiones** que hacen lo mismo con distinta 
 | RN-02 | El stock es un entero ≥ 0. |
 | RN-03 | Un producto con stock 0 **sigue en el catálogo**. No se puede añadir al carrito (en `v1` y `v2` su botón *Buy* aparece desactivado). |
 | RN-04 | Al añadir al carrito se comprueba que **unidades en el carrito + unidades nuevas ≤ stock**. |
-| RN-05 | Añadir al carrito **no descuenta** stock: el stock solo bajaría al hacer un pedido (fuera de alcance, §11). |
+| RN-05 | Añadir al carrito **no descuenta** stock: el stock solo bajaría al hacer un pedido (fuera de alcance, §12). |
 | RN-06 | Si se añade un producto que ya está en el carrito, se suman las unidades a su línea y se actualiza el precio. |
 | RN-07 | Quitar del carrito tantas unidades como hay (o más) elimina la línea. |
 | RN-08 | La búsqueda ignora espacios al principio y al final y no distingue mayúsculas. Un filtro vacío significa "no filtrar por eso". |
+| RN-09 | En `localStorage` solo se guarda el `id` y la cantidad de cada línea. Al recuperar el carrito se vuelve a pedir cada producto (precio y stock actuales) y se descartan las líneas cuyo producto ya no existe o no tiene stock suficiente. |
+| RN-10 | El carrito se guarda cada vez que cambia: al añadir, al quitar y al vaciar. |
 
 ---
 
@@ -153,7 +169,7 @@ Los listados vienen envueltos: `{ "products": [...], "total": 194, "skip": 0, "l
 | `price` | `Product.price` | `Math.round(price * 100)` → céntimos. |
 | `images[0]` | `Product.image` | Solo se guarda la primera imagen. |
 | `stock` | `sencilla`/`v1`: `Shop.inventory.get(id).stock` · `v2`: `Product.stock` | Ninguna. Ver la decisión en §6.1. |
-| `discountPercentage`, `rating`, `brand`, `tags`, `reviews` | — | No se usan (ver ampliaciones, §11). |
+| `discountPercentage`, `rating`, `brand`, `tags`, `reviews` | — | No se usan (ver ampliaciones, §12). |
 
 La conversión se centraliza en `Product.fromJson(json)`, para que si la API cambia solo haya que tocar un sitio.
 
@@ -178,6 +194,8 @@ Diagrama de clases completo: [`diagrama-clases.md`](diagrama-clases.md).
 | `formatPrice()` en `utils/functions.js` | Un único sitio para dar formato a los precios (`Product`, `Cart` y la interfaz lo usan). |
 | Errores propios (`NotAProductError`, `NotEnoughStockError`…) | Quien llama decide cómo mostrarlos (en la interfaz, con `alert`). Con `console.log` la interfaz no se enteraría del fallo. |
 | Las funciones de `ui/` solo crean elementos | Los eventos se conectan en `index.js`, que es el único archivo que conoce todas las piezas. |
+| `fetch` solo en `api.js` y `localStorage` solo en `storage.js` | Si cambia la API o la forma de guardar, solo se toca un archivo. Ambos archivos son **idénticos en las tres versiones**. |
+| En `localStorage` se guarda `[{ id, quantity }]`, no el carrito entero | `JSON.stringify` convierte las instancias en objetos normales y se pierden los métodos (`getSubtotal`, `getPriceEuro`…). Guardando solo ids, al arrancar se reconstruyen `Product` y `LineItem` de verdad, y con datos actualizados (§9). |
 | Los listeners se añaden **una sola vez** | Cada tarjeta recibe su listener al crearse; los botones fijos (paginación, carrito, formulario) se enganchan al arrancar. Ver problema 1 en §6.2. |
 
 ### 6.2 Revisión del código inicial
@@ -293,7 +311,7 @@ sequenceDiagram
 
 ### 7.3 `v2/` — paginación en el servidor con repositorio
 
-**Idea:** con una API real no se descargan los 194 productos para mostrar 10. Se pide **una página** y el servidor devuelve esa página y el **total** de resultados. `v2` simula ese funcionamiento sin necesidad de `fetch`.
+**Idea:** con una API real no se descargan los 194 productos para mostrar 10. Se pide **una página** y el servidor devuelve esa página y el **total** de resultados.
 
 **El repositorio** (`repositories/InMemoryProductRepository.js`) es el objeto que obtiene los datos. Cumple un **contrato** que también cumplirá el repositorio de la API:
 
@@ -303,7 +321,7 @@ getById(id)                                    →  Product | null
 getCategories()                                →  string[]
 ```
 
-**`Shop`** ya no guarda productos: sabe dónde pedirlos. Sus métodos `search`, `getProduct` y `getCategories` delegan en el repositorio, y le queda la regla de negocio `addToCart`.
+**`Shop`** ya no guarda productos: sabe dónde pedirlos. Sus métodos `search`, `getProduct` y `getCategories` delegan en el repositorio, y le queda la regla de negocio `addToCart`. Todos son `async`, porque el repositorio de la API tiene que esperar a la red.
 
 **El paginador** ya no recibe datos, sino una función para pedirlos:
 
@@ -358,10 +376,14 @@ sequenceDiagram
 | Dónde está el stock | `InventoryEntry` en `Shop` | `InventoryEntry` en `Shop` | `Product.stock` |
 | Comprobación de stock | `if` en `index.js` | `Shop.addToCart()` + `throw` | `Shop.addToCart()` + `throw` |
 | Formulario | HTML | `renderFilterForm()` con callback | `renderFilterForm()` con callback |
-| Archivos de JS | 8 | 9 | 10 |
+| Peticiones a la API al arrancar | 1 (todos los productos) | 1 (todos los productos) | 2 (categorías + página 1) |
+| Peticiones al cambiar de página o filtrar | Ninguna | Ninguna | 1 por cambio |
+| Recuperar el carrito guardado | Busca en `Shop` | `Shop.addToCart()` | `await shop.addToCart()` (1 petición por línea) |
+| Archivos de JS | 10 | 11 | 13 |
+| Líneas de JS (sin datos) | ~615 | ~715 | ~810 |
 | Conceptos nuevos | DOM, eventos, `slice` | + callbacks, objeto de opciones, getter | + repositorio, contrato, delegación |
 
-**Archivos que cambian de `v1` a `v2`:** `core/Product.js` (stock), `core/Shop.js`, `ui/paginator.js`, `ui/renderer.js` (la tarjeta recibe un `Product`) e `index.js`, más la carpeta nueva `repositories/`. `Cart`, `User`, `utils/`, el HTML y el CSS son idénticos.
+**Archivos que cambian de `v1` a `v2`:** `core/Product.js` (stock), `core/Shop.js`, `ui/paginator.js`, `ui/renderer.js` (la tarjeta recibe un `Product`) e `index.js`, más la carpeta nueva `repositories/`. `Cart`, `User`, `utils/`, `api.js`, `storage.js`, el HTML y el CSS son idénticos.
 
 ### 7.5 ¿Cuándo usar cada enfoque?
 
@@ -370,160 +392,171 @@ sequenceDiagram
 
 ---
 
+
 ## 8. Conexión con la API
 
-Una **única función** de acceso a la API sirve para las tres versiones. La condición es que devuelva **lo que manda la API, sin adaptarlo** a ninguna versión; cada versión se adapta a ella con una o dos líneas.
+Una **única función** de acceso a la API sirve para las tres versiones. La clave es que `api.js` devuelve **lo que manda la API, sin adaptarlo** a ninguna versión; cada versión se adapta a él. Por eso `api.js` es idéntico en las tres carpetas.
 
 ### 8.1 `api.js`
 
-Se crea en la raíz de cada versión (al lado de `index.js`):
+| Función | Petición | Devuelve |
+|---|---|---|
+| `fetchProducts({ search, category, page, pageSize })` | `/products`, `/products/search?q=` o `/products/category/x`, con `limit` y `skip` | `{ products, total, skip, limit }` |
+| `fetchProductById(id)` | `/products/{id}` | El producto, o `null` si no existe |
+| `fetchCategories()` | `/products/category-list` | `["beauty", "fragrances", …]` |
+
+Detalles:
+
+- `page` y `pageSize` son nuestros; la API usa `limit` y `skip`. La traducción es `skip = (page - 1) * pageSize`.
+- `pageSize = 0` (el valor por defecto) pide **todos** los productos: DummyJSON usa `limit=0` para eso.
+- El texto de búsqueda se pasa por `encodeURIComponent` para que espacios o símbolos no rompan la URL.
+- Si la respuesta no es correcta (`!response.ok`), `fetchProducts` y `fetchCategories` lanzan un error; quien llama decide cómo mostrarlo.
+
+### 8.2 `sencilla/` y `v1/`: todos los productos de una vez
+
+Como paginan en el cliente, piden todos los productos al arrancar. `data` tiene la misma forma que `products.json`, así que el resto del código no cambió respecto a la versión con el JSON local:
 
 ```js
-const BASE_URL = "https://dummyjson.com/products";
+productList.textContent = "Loading products...";
 
-// Devuelve lo que manda DummyJSON: { products, total, skip, limit }
-// pageSize = 0 → todos los productos (DummyJSON usa limit=0 para eso)
-async function fetchProducts({ search = "", category = "", page = 1, pageSize = 0 } = {}) {
-    const skip = (page - 1) * pageSize;
-    let url = `${BASE_URL}?limit=${pageSize}&skip=${skip}`;
-
-    if (search !== "") {
-        url = `${BASE_URL}/search?q=${encodeURIComponent(search)}&limit=${pageSize}&skip=${skip}`;
-    } else if (category !== "") {
-        url = `${BASE_URL}/category/${category}?limit=${pageSize}&skip=${skip}`;
-    }
-
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error("Error loading products: " + response.status);
-    }
-    return await response.json();
+let data;
+try {
+    data = await fetchProducts(); // sin parámetros → limit=0 → todos
+} catch (error) {
+    productList.textContent = "Could not load the products. Please try again later.";
+    throw error; // paramos aquí: sin productos no hay tienda
 }
-
-async function fetchCategories() {
-    const response = await fetch(`${BASE_URL}/category-list`);
-    if (!response.ok) {
-        throw new Error("Error loading categories: " + response.status);
-    }
-    return await response.json(); // ["beauty", "fragrances", ...]
-}
-
-export { fetchProducts, fetchCategories };
 ```
 
-### 8.2 `sencilla/` y `v1/`: un solo cambio
+- `await` se puede usar en el nivel superior de `index.js` porque es un módulo (`type="module"`).
+- El texto *"Loading products..."* desaparece cuando se pinta la primera página.
+- Después de la carga, filtrar y cambiar de página no hace ninguna petición más.
+- Para trabajar sin conexión, hay una línea comentada que carga `data/products.json` en su lugar.
 
-Como paginan en el cliente, piden **todos** los productos una vez y siguen funcionando igual. `data` tiene la misma forma que `products.json`, así que el resto del código no cambia.
+### 8.3 `v2/`: `ApiProductRepository`
 
-```js
-// Antes
-import data from "./data/products.json" with { type: "json" };
-
-// Después
-import { fetchProducts } from "./api.js";
-
-document.getElementById("product__list").textContent = "Loading products...";
-const data = await fetchProducts(); // limit=0 → los 194 productos
-```
-
-`await` se puede usar directamente en el nivel superior de `index.js` porque es un módulo (`type="module"`). El texto *"Loading products..."* desaparece cuando `showPage()` / `paginator.render()` vacían la lista para pintar la primera página.
-
-### 8.3 `v2/`: un repositorio nuevo
-
-Se crea `repositories/ApiProductRepository.js` con los mismos tres métodos que `InMemoryProductRepository`:
-
-```js
-import Product from "../core/Product.js";
-import { fetchProducts, fetchCategories } from "../api.js";
-
-class ApiProductRepository {
-    async search(params) {
-        const data = await fetchProducts(params);
-        return {
-            items: data.products.map(json => Product.fromJson(json)),
-            total: data.total
-        };
-    }
-
-    async getById(id) {
-        const response = await fetch(`https://dummyjson.com/products/${id}`);
-        if (!response.ok) return null;
-        return Product.fromJson(await response.json());
-    }
-
-    async getCategories() {
-        return await fetchCategories();
-    }
-}
-
-export default ApiProductRepository;
-```
-
-En `index.js` se cambia la línea del bloque 1:
+Se añade `repositories/ApiProductRepository.js`, que cumple el mismo contrato que `InMemoryProductRepository`, y en `index.js` cambia **una línea**:
 
 ```js
 const productRepository = new ApiProductRepository();
+// const productRepository = new InMemoryProductRepository(data.products); // sin conexión
 ```
 
-**Lo asíncrono se contagia hacia arriba.** Como el repositorio ahora devuelve promesas, quien lo usa tiene que esperar:
+El repositorio convierte las respuestas de la API al formato del contrato:
+
+| Método | Qué hace |
+|---|---|
+| `search(params)` | Llama a `fetchProducts(params)` y devuelve `{ items: products.map(Product.fromJson), total }` |
+| `getById(id)` | Llama a `fetchProductById(id)` y lo convierte con `Product.fromJson` |
+| `getCategories()` | Llama a `fetchCategories()` |
+
+**Lo asíncrono se contagia hacia arriba.** Como el repositorio devuelve promesas, todo lo que lo usa tiene que esperar:
 
 | Archivo | Cambio |
 |---|---|
-| `core/Shop.js` | `search`, `getProduct`, `getCategories` y `addToCart` pasan a ser `async`; dentro, `await this.products...` |
-| `ui/paginator.js` | `async load(...)` y `const { items, total } = await this.fetchPage(...)` |
-| `index.js` | `handleBuy` pasa a ser `async` (con `await shop.addToCart(...)` dentro del `try`); las categorías se cargan con `const categories = await shop.getCategories();` antes de `renderFilterForm` |
+| `core/Shop.js` | `search`, `getProduct`, `getCategories` y `addToCart` son `async` y usan `await this.products...`. Siguen funcionando con el repositorio en memoria: `await` de un valor normal devuelve ese valor. |
+| `ui/paginator.js` | `load` es `async` y hace `await this.fetchPage(...)`. Además: un *flag* `isLoading` ignora los clicks mientras llega una página, y un `try/catch` muestra un mensaje si la petición falla (`finally` libera el *flag* siempre). |
+| `index.js` | `handleBuy` es `async` (`await shop.addToCart(...)` dentro del `try`). Al arrancar: `await shop.getCategories()` antes de crear el formulario, `await paginator.load(1)` y `await restoreCart()`. |
 
-### 8.4 Limitación de la API
+### 8.4 Búsqueda y categoría a la vez
 
-En DummyJSON, la búsqueda por texto (`/products/search?q=`) y el filtro por categoría (`/products/category/x`) son **endpoints distintos** y no se pueden combinar en una sola petición. En `fetchProducts`, si hay texto, manda la búsqueda y se ignora la categoría.
+En DummyJSON, la búsqueda por texto (`/products/search?q=`) y el filtro por categoría (`/products/category/x`) son **endpoints distintos** y no se pueden combinar en una petición.
 
-- En `sencilla/` y `v1/` no afecta: se descargan todos los productos y el filtrado lo hace `Shop.filterProducts()`, que sí combina ambos.
-- En `v2/`, buscar "iphone" con la categoría "laptops" mostraría los iPhone igualmente. Es un buen ejemplo de que **el contrato lo define la aplicación y el repositorio se adapta a lo que la API permite**: si se quisiera combinar, el repositorio podría pedir la categoría y filtrar el texto en el cliente.
+- En `sencilla/` y `v1/` no afecta: el filtrado lo hace `Shop.filterProducts()` sobre todos los productos.
+- En `v2/`, `ApiProductRepository.search` detecta el caso: pide **todos** los resultados de la búsqueda (`limit=0`), filtra la categoría y corta la página él mismo. El paginador y la tienda no se enteran: reciben `{ items, total }` como siempre.
+
+Es un buen ejemplo de que **el contrato lo define la aplicación y el repositorio se adapta a lo que la API permite**.
 
 ---
 
-## 9. Pruebas realizadas
+## 9. Carrito en `localStorage`
 
-Las tres versiones se han probado con los mismos casos y dan los mismos resultados:
+### 9.1 Qué se guarda
+
+`storage.js` (idéntico en las tres versiones) tiene dos funciones:
+
+| Función | Qué hace |
+|---|---|
+| `saveCart(cart)` | Guarda en la clave `"cart"` un array con el id y la cantidad de cada línea |
+| `loadCartLines()` | Devuelve ese array, o `[]` si no hay nada guardado o el texto no es JSON válido |
+
+Contenido de `localStorage` (se puede ver en las herramientas del navegador, `F12` → *Application* → *Local Storage*):
+
+```json
+cart = [{"id":1,"quantity":1},{"id":26,"quantity":3}]
+```
+
+### 9.2 Por qué no se guarda el carrito entero
+
+`localStorage` solo guarda texto. Si se hiciera `JSON.stringify(cart)`, al leerlo con `JSON.parse` se obtendrían **objetos normales**, no instancias de `Cart`, `LineItem` ni `Product`: no tendrían `getSubtotal()`, `getPriceEuro()`… y el `Map` de `items` se convertiría en `{}`.
+
+Guardando solo `{ id, quantity }`:
+
+- Al arrancar, los objetos se crean otra vez con las clases de verdad (`cart.add(product, quantity)` crea el `LineItem`).
+- El precio y el stock son **los actuales**, no los del momento en que se guardó.
+- Si un producto ya no existe o ya no hay stock suficiente, esa línea se descarta (RN-09).
+
+### 9.3 Cuándo se guarda y cuándo se recupera
+
+- **Guardar:** en la función que se llama cada vez que el carrito cambia (`updateCart()`), al añadir, quitar o vaciar.
+- **Recuperar:** una vez al arrancar, después de cargar los productos.
+
+| Versión | Cómo se recupera cada línea |
+|---|---|
+| `sencilla/` | `shop.hasStock(id, quantity)` y, si hay, `cart.add(shop.findProduct(id).product, quantity)` |
+| `v1/` | `shop.addToCart(cart, id, quantity)` dentro de un `try` (la propia tienda valida el stock) |
+| `v2/` | `await shop.addToCart(cart, id, quantity)`: la tienda no tiene todos los productos, así que **pide cada uno a la API** con `getById` |
+
+---
+
+## 10. Pruebas realizadas
+
+Las tres versiones se han probado con una API simulada que responde igual que DummyJSON (mismos endpoints, `limit`, `skip` y `total`), con estos resultados:
 
 | # | Acción | Resultado esperado |
 |---|---|---|
-| 1 | Abrir la página | 10 tarjetas, "Page 1 of 20", *Previous* desactivado |
+| 1 | Abrir la página | 10 tarjetas, "Page 1 of 20", *Previous* desactivado. `sencilla`/`v1`: 1 petición (`/products?limit=0`). `v2`: 2 peticiones (categorías y `/products?limit=10&skip=0`) |
 | 2 | Pulsar *Next* | 10 tarjetas nuevas, "Page 2 of 20" |
-| 3 | Buscar "iphone" en "smartphones" | 4 productos (iPhone 5s, 6, 13 Pro y X), "Page 1 of 1", ambos botones desactivados |
-| 4 | Buscar con texto vacío y categoría *All* | Vuelve el catálogo completo, "Page 1 of 20" |
-| 5 | Pulsar *Buy* dos veces en "Essence Mascara Lash Princess" | 🛒 2, total 19.98€, subtotal de la línea 19.98€ |
-| 6 | Pulsar *Buy* cuatro veces en "Green Chili Pepper" (stock 3) | Aviso "Not enough stock of Green Chili Pepper" en el cuarto click; el carrito suma solo 3 unidades |
-| 7 | Buscar "zzzz" | Lista vacía, "Page 1 of 1", ambos botones desactivados |
-| 8 | Pulsar el botón 🛒 | Se muestra / oculta el detalle del carrito |
+| 3 | Buscar "iphone" en "smartphones" | 4 productos (iPhone 5s, 6, 13 Pro y X), "Page 1 of 1" |
+| 4 | Buscar "iphone" en "laptops" | Lista vacía, "Page 1 of 1" (también en `v2`, gracias a §8.4) |
+| 5 | Pulsar *Buy* dos veces en "Essence Mascara Lash Princess" | 🛒 2, total 19.98€ |
+| 6 | Pulsar *Buy* cuatro veces en "Green Chili Pepper" (stock 3) | Aviso "Not enough stock of Green Chili Pepper" en el cuarto click; 🛒 5 |
+| 7 | Pulsar −1 en la línea de la máscara | 🛒 4; `localStorage` guarda `[{"id":1,"quantity":1},{"id":26,"quantity":3}]` |
+| 8 | Recargar la página | El carrito vuelve: 🛒 4, total 12.96€ |
+| 9 | Pulsar *Empty cart* | 🛒 0, "The cart is empty"; `localStorage` guarda `[]` |
+| 10 | Recargar con un valor estropeado en `localStorage` | La tienda arranca con el carrito vacío y el catálogo normal |
+| 11 | Abrir sin conexión / con la API caída | Mensaje "Could not load the products…" (`v2`: "Could not load the data…") |
 
 Productos útiles para probar el stock: "Green Chili Pepper" (3), "Black & Brown Slipper" (3). Agotados (stock 0): "Sportbike Motorcycle", "Samsung Galaxy S8", "Volleyball", "Watch Gold for Women".
 
+> Los datos de la API real pueden cambiar (stock, precios, productos). Si un resultado no coincide, compáralo con la copia local de `data/products.json`.
+
 ---
 
-## 10. Decisiones tomadas
+## 11. Decisiones tomadas
 
 | Pregunta | Decisión |
 |---|---|
 | ¿Qué pasa si un cliente añade al carrito más unidades de las que hay en stock? | Se avisa **al añadir** (RN-04), no se espera a un checkout. |
 | ¿Se aplican descuentos? | No. DummyJSON trae `discountPercentage`, pero se muestra el precio base (ver ampliaciones). |
 | ¿Cómo se simula el usuario actual? | Un único `Client` creado en `index.js`. No hay login. |
-| ¿Se guarda algo en `localStorage`? | No en esta entrega (ver ampliaciones). |
+| ¿Qué se guarda en `localStorage` y en qué formato? | Solo el carrito, como `[{ id, quantity }]` en la clave `"cart"` (§9). |
 | ¿Tallas y colores? | Se descartan: DummyJSON no los trae. |
 | ¿Qué categorías se muestran? | Todas las del catálogo de DummyJSON (24), no solo las de ropa. |
 | ¿Cuántos productos por página? | 10 (constante `PRODUCTS_PER_PAGE` en `sencilla`, opción `pageSize` en `v1`/`v2`). |
+| ¿Qué pasa si la API no responde? | Se muestra un mensaje en la lista de productos. En `sencilla`/`v1` la aplicación se detiene ahí; en `v2` se puede volver a intentar cambiando de página o filtrando. |
 
 ---
 
-## 11. Posibles ampliaciones
+## 12. Posibles ampliaciones
 
 Fuera del alcance de esta entrega, ordenadas de más sencilla a más compleja:
 
-1. **Quitar unidades desde el carrito.** `Cart.remove()` y `Cart.deleteItem()` ya existen; falta añadir botones en `renderCart` / `renderCartDetail`.
-2. **Mostrar "agotado"** en la tarjeta en lugar de solo desactivar el botón.
+1. **Mostrar "agotado"** en la tarjeta en lugar de solo desactivar el botón.
+2. **Botón "+1"** en las líneas del carrito (reutilizando la comprobación de stock).
 3. **Precio con descuento:** añadir `discountPercentage` a `Product` y un método `getFinalPrice()` redondeado al céntimo.
 4. **Solo categorías de ropa:** filtrar el catálogo a `mens-shirts`, `mens-shoes`, `tops`, `womens-dresses`, `womens-shoes`, `womens-bags`, etc.
-5. **Persistir el carrito en `localStorage`.** Ojo: `JSON.stringify` pierde las clases, así que al leerlo hay que reconstruir los `Product` y `LineItem`.
-6. **Pedidos (`Order`) y checkout:** validar el stock de todo el carrito, descontarlo (todo o nada), crear el pedido con los precios del momento y vaciar el carrito.
+5. **Botón "Retry"** cuando la API falla, en lugar de tener que recargar.
+6. **Pedidos (`Order`) y checkout:** validar el stock de todo el carrito, descontarlo (todo o nada), crear el pedido con los precios del momento, vaciar el carrito y guardar el historial en `localStorage`.
 7. **Trabajadores (`Worker extends User`)** que puedan dar de alta productos y reponer stock.
 8. **Página de detalle** de un producto con sus reseñas (`reviews`).

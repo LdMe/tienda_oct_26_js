@@ -98,7 +98,7 @@ function renderCartBadge(buttonId, cart) {
     document.getElementById(buttonId).textContent = `🛒 ${cart.getTotalQuantity()}`;
 }
 
-function createCartLine(line) {
+function createCartLine(line, onRemove) {
     const article = document.createElement("article");
     article.classList.add("product-line");
 
@@ -115,11 +115,18 @@ function createCartLine(line) {
     const subtotal = document.createElement("p");
     subtotal.textContent = formatPrice(line.getSubtotal());
 
-    article.append(image, title, quantity, subtotal);
+    const removeButton = document.createElement("button");
+    removeButton.textContent = "−1";
+    removeButton.classList.add("remove-button");
+    removeButton.addEventListener("click", () => onRemove(line.product.id));
+
+    article.append(image, title, quantity, subtotal, removeButton);
     return article;
 }
 
-function renderCartDetail(sectionId, cart) {
+// Pinta las líneas del carrito y el total. Al pulsar "−1" en una línea
+// llama a onRemove(productId): qué hacer lo decide quien la llama.
+function renderCartDetail(sectionId, cart, onRemove) {
     const section = document.getElementById(sectionId);
     section.replaceChildren();
 
@@ -128,7 +135,7 @@ function renderCartDetail(sectionId, cart) {
         return;
     }
 
-    const lines = cart.getLines().map(line => createCartLine(line));
+    const lines = cart.getLines().map(line => createCartLine(line, onRemove));
 
     const total = document.createElement("p");
     total.classList.add("total");

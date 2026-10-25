@@ -4,7 +4,7 @@
 // a la que pide "dame la página N" y que le devuelve { items, total }.
 // Cortar la página es trabajo de quien tiene los datos, no del paginador.
 //
-// CONTRATO de fetchPage:
+// CONTRATO de fetchPage (puede ser async):
 //   fetchPage({ page, pageSize, ...params })  ->  { items, total }
 //
 // Los params (filtros) son un objeto que el paginador guarda y reenvía
@@ -20,6 +20,7 @@ class Paginator {
         this.params = {};
         this.currentPage = 1;
         this.total = 0;                   // lo sabemos por la respuesta, no por los datos
+        this.isLoading = false;           // evita pedir otra página mientras llega una
     }
 
     get totalPages() {
@@ -36,41 +37,52 @@ class Paginator {
 
     // Pide una página y la pinta.
     // append = true: añade debajo (scroll infinito). false: sustituye la página.
-    load(page, append = false) {
-        const { items, total } = this.fetchPage({
-            ...this.params,
-            page: page,
-            pageSize: this.pageSize
-        });
+    async load(page, append = false) {
+        if (this.isLoading) return; // doble click mientras carga: lo ignoramos
+        this.isLoading = true;
 
-        this.currentPage = page;
-        this.total = total;
+        try {
+            const { items, total } = await this.fetchPage({
+                ...this.params,
+                page: page,
+                pageSize: this.pageSize
+            });
 
-        if (!append) {
-            this.container.replaceChildren();
+            this.currentPage = page;
+            this.total = total;
+
+            if (!append) {
+                this.container.replaceChildren();
+            }
+            const nodes = items.map(item => this.renderItem(item));
+            this.container.append(...nodes);
+        } catch (error) {
+            this.container.textContent = "Could not load the data. Please try again later.";
+            console.error(error);
+        } finally {
+            // finally se ejecuta siempre, haya ido bien o mal
+            this.isLoading = false;
         }
-        const nodes = items.map(item => this.renderItem(item));
-        this.container.append(...nodes);
 
         this.onChange(this);
     }
 
     // Nuevos filtros: volvemos a la página 1 y limpiamos
-    setParams(params) {
+    async setParams(params) {
         this.params = params;
-        this.load(1);
+        await this.load(1);
     }
 
-    nextPage() {
+    async nextPage() {
         if (this.hasNext()) {
-            this.load(this.currentPage + 1, this.infiniteScroll);
+            await this.load(this.currentPage + 1, this.infiniteScroll);
         }
     }
 
-    previousPage() {
+    async previousPage() {
         // Con scroll infinito no tiene sentido "volver": las páginas anteriores ya se ven
         if (!this.infiniteScroll && this.hasPrevious()) {
-            this.load(this.currentPage - 1);
+            await this.load(this.currentPage - 1);
         }
     }
 }

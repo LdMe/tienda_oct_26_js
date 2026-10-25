@@ -3,25 +3,8 @@ import Product from "./core/Product.js";
 import Cart from "./core/Cart.js";
 import { Client } from "./core/User.js";
 import { createProductCard, renderCategoryOptions, renderCart } from "./ui/renderer.js";
-import data from "./data/products.json" with { type: "json" };
-
-// ===================== DATOS =====================
-
-const shop = new Shop("Mi tienda");
-
-for (const json of data.products) {
-    const product = Product.fromJson(json);
-    shop.addProduct(product, json.stock);
-}
-
-const client = new Client(1, "Yisus", "Krais", "yisus.krais@god.com");
-const cart = new Cart(client);
-
-// ===================== ESTADO DE LA PÁGINA =====================
-
-const PRODUCTS_PER_PAGE = 10;
-let currentPage = 1;
-let productsToShow = shop.getProducts(); // al filtrar, aquí guardamos el resultado
+import { fetchProducts } from "./api.js";
+import { saveCart, loadCartLines } from "./storage.js";
 
 // ===================== ELEMENTOS DEL HTML =====================
 
@@ -34,6 +17,49 @@ const searchInput = document.getElementById("search-input");
 const categorySelect = document.getElementById("category-select");
 const cartButton = document.getElementById("cart-button");
 const cartSection = document.getElementById("cart");
+const cartLines = document.getElementById("cart-lines");
+const emptyCartButton = document.getElementById("empty-cart-button");
+
+// ===================== DATOS (desde la API) =====================
+
+// Como index.js es un módulo (type="module"), podemos usar await aquí directamente.
+// Pedimos TODOS los productos una sola vez y luego paginamos y filtramos nosotros.
+productList.textContent = "Loading products...";
+
+let data;
+try {
+    data = await fetchProducts(); // sin parámetros → limit=0 → todos
+    // Sin conexión, se puede usar la copia local en su lugar:
+    // data = (await import("./data/products.json", { with: { type: "json" } })).default;
+} catch (error) {
+    productList.textContent = "Could not load the products. Please try again later.";
+    throw error; // paramos aquí: sin productos no hay tienda
+}
+
+const shop = new Shop("Mi tienda");
+
+for (const json of data.products) {
+    const product = Product.fromJson(json);
+    shop.addProduct(product, json.stock);
+}
+
+const client = new Client(1, "Yisus", "Krais", "yisus.krais@god.com");
+const cart = new Cart(client);
+
+// Recuperamos el carrito guardado en localStorage (si lo hay).
+// Si el producto ya no existe o ya no hay stock suficiente, esa línea se ignora.
+for (const saved of loadCartLines()) {
+    if (shop.hasStock(saved.id, saved.quantity)) {
+        const entry = shop.findProduct(saved.id);
+        cart.add(entry.product, saved.quantity);
+    }
+}
+
+// ===================== ESTADO DE LA PÁGINA =====================
+
+const PRODUCTS_PER_PAGE = 10;
+let currentPage = 1;
+let productsToShow = shop.getProducts(); // al filtrar, aquí guardamos el resultado
 
 // ===================== FUNCIONES =====================
 
@@ -83,12 +109,31 @@ function buyProduct(product) {
     }
 
     cart.add(product, 1);
+    updateCart();
+}
+
+function removeFromCart(productId) {
+    cart.remove(productId, 1);
+    updateCart();
+}
+
+// Cada vez que el carrito cambia: lo guardamos y lo volvemos a pintar
+function updateCart() {
+    saveCart(cart);
     showCart();
 }
 
 function showCart() {
     cartButton.textContent = "🛒 " + cart.getTotalQuantity();
-    renderCart(cartSection, cart);
+    renderCart(cartLines, cart);
+
+    // Los botones "−1" se acaban de crear, así que les ponemos su listener ahora.
+    // dataset siempre es texto: lo pasamos a número para buscar en el carrito.
+    for (const button of cartLines.querySelectorAll(".remove-button")) {
+        button.addEventListener("click", () => {
+            removeFromCart(Number(button.dataset.productId));
+        });
+    }
 }
 
 // ===================== EVENTOS =====================
@@ -112,6 +157,11 @@ filterForm.addEventListener("submit", (event) => {
 
 cartButton.addEventListener("click", () => {
     cartSection.classList.toggle("hidden");
+});
+
+emptyCartButton.addEventListener("click", () => {
+    cart.clear();
+    updateCart();
 });
 
 // ===================== INICIO =====================

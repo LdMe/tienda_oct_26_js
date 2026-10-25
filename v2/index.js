@@ -1,10 +1,12 @@
 // index.js es el único sitio que conoce todas las piezas y las conecta.
-// Cada pieza por separado (repositorio, Shop, Cart, Paginator, renderer) no sabe de las demás.
+// Cada pieza por separado (repositorio, Shop, Cart, Paginator, renderer, storage) no sabe de las demás.
 
 import Shop from "./core/Shop.js";
 import Cart from "./core/Cart.js";
 import { Client } from "./core/User.js";
-import InMemoryProductRepository from "./repositories/InMemoryProductRepository.js";
+import ApiProductRepository from "./repositories/ApiProductRepository.js";
+// import InMemoryProductRepository from "./repositories/InMemoryProductRepository.js";
+// import data from "./data/products.json" with { type: "json" };
 import Paginator from "./ui/paginator.js";
 import {
     createProductCard,
@@ -13,12 +15,13 @@ import {
     renderCartDetail,
     renderPageInfo
 } from "./ui/renderer.js";
-import data from "./data/products.json" with { type: "json" };
+import { saveCart, loadCartLines } from "./storage.js";
 
 // ---------- 1. Acceso a datos ----------
-// Esta es la ÚNICA línea que cambiará cuando usemos la API:
-//   const productRepository = new ApiProductRepository("https://dummyjson.com");
-const productRepository = new InMemoryProductRepository(data.products);
+// Esta es la ÚNICA línea que hay que cambiar para elegir de dónde salen los datos.
+// Sin conexión, descomenta los dos imports de arriba y usa la otra línea.
+const productRepository = new ApiProductRepository();
+// const productRepository = new InMemoryProductRepository(data.products);
 
 // ---------- 2. Lógica de negocio ----------
 
@@ -29,24 +32,45 @@ const cart = new Cart(client);
 
 // ---------- 3. Elementos del DOM ----------
 
+const productList = document.getElementById("product__list");
 const prevButton = document.getElementById("prev-button");
 const nextButton = document.getElementById("next-button");
 const cartButton = document.getElementById("cart-button");
 const cartSection = document.getElementById("cart");
+const emptyCartButton = document.getElementById("empty-cart-button");
 
 // ---------- 4. Acciones ----------
 
 function updateCart() {
+    saveCart(cart);
     renderCartBadge("cart-button", cart);
-    renderCartDetail("cart", cart);
+    renderCartDetail("cart-lines", cart, handleRemove);
 }
 
-function handleBuy(productId) {
+// async porque addToCart tiene que pedir el producto a la API
+async function handleBuy(productId) {
     try {
-        shop.addToCart(cart, productId, 1);
+        await shop.addToCart(cart, productId, 1);
         updateCart();
     } catch (error) {
         alert(error.message);
+    }
+}
+
+function handleRemove(productId) {
+    cart.remove(productId, 1);
+    updateCart();
+}
+
+// En esta versión la tienda no tiene todos los productos: para recuperar
+// el carrito guardado hay que pedir cada producto a la API (getById).
+async function restoreCart() {
+    for (const saved of loadCartLines()) {
+        try {
+            await shop.addToCart(cart, saved.id, saved.quantity);
+        } catch (error) {
+            console.warn("Saved cart line discarded:", error.message);
+        }
     }
 }
 
@@ -64,17 +88,30 @@ const paginator = new Paginator({
     }
 });
 
-// ---------- 6. Eventos (se ponen una sola vez) ----------
+// ---------- 6. Arranque ----------
+// "await" en el nivel superior funciona porque index.js es un módulo.
 
-renderFilterForm("search-menu", shop.getCategories(), (filters) => {
+productList.textContent = "Loading products...";
+
+let categories = [];
+try {
+    categories = await shop.getCategories();
+} catch (error) {
+    console.error(error); // sin categorías el filtro solo tendrá "All"
+}
+
+renderFilterForm("search-menu", categories, (filters) => {
     paginator.setParams(filters); // el paginador guarda los filtros y pide la página 1
 });
 
 prevButton.addEventListener("click", () => paginator.previousPage());
 nextButton.addEventListener("click", () => paginator.nextPage());
 cartButton.addEventListener("click", () => cartSection.classList.toggle("hidden"));
+emptyCartButton.addEventListener("click", () => {
+    cart.clear();
+    updateCart();
+});
 
-// ---------- 7. Primer pintado ----------
-
-paginator.load(1);
+await paginator.load(1);
+await restoreCart();
 updateCart();

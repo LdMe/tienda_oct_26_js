@@ -68,7 +68,14 @@ function renderCart(section, cart) {
         const subtotal = document.createElement("p");
         subtotal.textContent = formatPrice(line.getSubtotal());
 
-        article.append(image, title, quantity, subtotal);
+        // Botón para quitar una unidad. Guardamos el id del producto en el botón
+        // (data-product-id) para saber cuál quitar cuando se pulse (en index.js).
+        const removeButton = document.createElement("button");
+        removeButton.textContent = "−1";
+        removeButton.classList.add("remove-button");
+        removeButton.dataset.productId = line.product.id;
+
+        article.append(image, title, quantity, subtotal, removeButton);
         section.append(article);
     }
 

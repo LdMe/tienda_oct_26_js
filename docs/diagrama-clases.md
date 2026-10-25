@@ -95,6 +95,8 @@ classDiagram
 
 En `v2` la tienda no guarda productos: los pide a un repositorio. El stock pasa a `Product` (como lo manda la API) y desaparece `InventoryEntry`. `Cart`, `LineItem`, `User` y `Client` son iguales que en el diagrama anterior.
 
+La aplicación usa `ApiProductRepository`; `InMemoryProductRepository` se conserva para trabajar sin conexión. Como el de la API tiene que esperar a la red, los métodos de `Shop` son `async` y devuelven promesas.
+
 ```mermaid
 classDiagram
     direction LR
@@ -102,10 +104,10 @@ classDiagram
     class Shop {
         +String name
         +ProductRepository products
-        +search(params) SearchResult
-        +getProduct(id) Product
-        +getCategories() String[]
-        +addToCart(cart, productId, quantity)
+        +search(params) Promise~SearchResult~
+        +getProduct(id) Promise~Product~
+        +getCategories() Promise~String[]~
+        +addToCart(cart, productId, quantity) Promise
     }
 
     class ProductRepository {
@@ -123,7 +125,6 @@ classDiagram
     }
 
     class ApiProductRepository {
-        «fase 3»
         +search(params) Promise~SearchResult~
         +getById(id) Promise~Product~
         +getCategories() Promise~String[]~
@@ -157,6 +158,8 @@ classDiagram
 ```
 
 `ProductRepository` no existe como archivo: JavaScript no tiene interfaces. Es el **contrato** (los tres métodos y lo que devuelven) que cumplen los dos repositorios, y por eso se pueden intercambiar cambiando una sola línea de `index.js`.
+
+`ApiProductRepository.search` cumple el contrato aunque la API no permita combinar búsqueda y categoría: en ese caso pide todos los resultados de la búsqueda, filtra la categoría y corta la página él mismo.
 
 ## 3. `Paginator` en `v1/` y `v2/`
 
@@ -195,11 +198,12 @@ classDiagram
         +Object params
         +Number currentPage
         +Number total
+        +Boolean isLoading
         +totalPages Number «getter: total»
         +hasNext() Boolean
         +hasPrevious() Boolean
-        +setParams(params)
-        +load(page, append)
+        +setParams(params) Promise
+        +load(page, append) Promise
         +nextPage()
         +previousPage()
     }
@@ -210,11 +214,27 @@ classDiagram
 | Recibe | `items`: todos los datos | `fetchPage`: una función que devuelve `{ items, total }` |
 | Corta la página | Él mismo, con `slice` | Quien responde a `fetchPage` |
 | Cambiar los datos / filtros | `setItems(items)` | `setParams(params)` |
-| Pintar | `render(append)` | `load(page, append)` |
+| Pintar | `render(append)` | `load(page, append)`, `async` |
+| Errores | — (los datos ya están) | `try/catch`: muestra un mensaje si la petición falla |
 
 En `sencilla/` no hay clase `Paginator`: el mismo trabajo lo hacen las variables `currentPage` y `productsToShow` y la función `showPage()` de `index.js`.
 
-## 4. Cómo leer los diagramas
+## 4. Módulos que no son clases
+
+Además de las clases, cada versión tiene dos módulos de funciones, **idénticos en las tres**:
+
+| Archivo | Funciones | Responsabilidad |
+|---|---|---|
+| `api.js` | `fetchProducts(params)`, `fetchProductById(id)`, `fetchCategories()` | Único sitio con `fetch`. Devuelve los datos tal cual los manda DummyJSON. |
+| `storage.js` | `saveCart(cart)`, `loadCartLines()` | Único sitio con `localStorage`. Guarda y lee `[{ id, quantity }]`. |
+
+Quién los usa:
+
+- `sencilla/` y `v1/`: `index.js` llama a `fetchProducts()` una vez y crea `Product` con `fromJson`.
+- `v2/`: `ApiProductRepository` llama a las tres funciones de `api.js`.
+- Las tres versiones: `index.js` llama a `saveCart` cada vez que cambia el carrito y a `loadCartLines` al arrancar.
+
+## 5. Cómo leer los diagramas
 
 | Símbolo | Significa | En nuestro modelo |
 |---|---|---|
@@ -226,7 +246,7 @@ En `sencilla/` no hay clase `Paginator`: el mismo trabajo lo hacen las variables
 | `$` | Método estático | `Product.fromJson(json)` |
 | `+` / `-` | Público / de uso interno | `inventory` e `items` solo se deberían tocar desde su clase |
 
-## 5. Estructuras de datos internas
+## 6. Estructuras de datos internas
 
 `Shop.inventory` en `sencilla/` y `v1/`:
 
@@ -248,7 +268,7 @@ items = Map {
 // getTotalPrice(true) → "19.98€"
 ```
 
-Respuesta de `search` en `v2/` (`InMemoryProductRepository` y, en la fase 3, `ApiProductRepository`):
+Respuesta de `search` en `v2/` (`ApiProductRepository` e `InMemoryProductRepository`):
 
 ```js
 {
@@ -258,3 +278,9 @@ Respuesta de `search` en `v2/` (`InMemoryProductRepository` y, en la fase 3, `Ap
 ```
 
 Usar un `Map` con el `id` como clave hace que buscar un producto o una línea del carrito sea inmediato, sin recorrer arrays.
+
+Contenido de `localStorage` (clave `"cart"`, todas las versiones). Solo ids y cantidades: al arrancar se reconstruyen los `Product` y `LineItem` de verdad:
+
+```json
+[{"id":1,"quantity":1},{"id":26,"quantity":3}]
+```
