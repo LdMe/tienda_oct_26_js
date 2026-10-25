@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tienda</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Tienda</h1>
+        <button id="cart-button">🛒 0</button>
+    </header>
+
+    <section id="cart" class="hidden"></section>
+
+    <!-- El formulario está escrito aquí. Desde JS solo rellenamos las categorías. -->
+    <form id="filter-form">
+        <label for="search-input">Search</label>
+        <input id="search-input" name="search">
+
+        <label for="category-select">Category</label>
+        <select id="category-select" name="category">
+            <option value="">All</option>
+        </select>
+
+        <button type="submit">Search</button>
+    </form>
+
+    <nav class="pagination">
+        <button id="prev-button">Previous</button>
+        <span id="page-info"></span>
+        <button id="next-button">Next</button>
+    </nav>
+
+    <section id="product__list"></section>
+
+    <script type="module" src="index.js"></script>
+</body>
+</html>

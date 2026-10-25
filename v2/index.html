@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tienda</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Tienda</h1>
+        <button id="cart-button">🛒 0</button>
+    </header>
+
+    <section id="cart" class="hidden"></section>
+
+    <section id="search-menu"></section>
+
+    <nav class="pagination">
+        <button id="prev-button">Previous</button>
+        <span id="page-info"></span>
+        <button id="next-button">Next</button>
+    </nav>
+
+    <section id="product__list"></section>
+
+    <!-- type="module" para poder usar import/export -->
+    <script type="module" src="index.js"></script>
+</body>
+</html>
