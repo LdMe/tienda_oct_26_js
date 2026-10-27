@@ -5,6 +5,7 @@ import Shop from "./core/Shop.js";
 import Cart from "./core/Cart.js";
 import { Client } from "./core/User.js";
 import InMemoryProductRepository from "./repositories/InMemoryProductRepository.js";
+import ApiProductRepository from "./repositories/ApiProductRepository.js";
 import Paginator from "./ui/paginator.js";
 import {
     createProductCard,
@@ -17,8 +18,8 @@ import data from "./data/products.json" with { type: "json" };
 
 // ---------- 1. Acceso a datos ----------
 // Esta es la ÚNICA línea que cambiará cuando usemos la API:
-//   const productRepository = new ApiProductRepository("https://dummyjson.com");
-const productRepository = new InMemoryProductRepository(data.products);
+   const productRepository = new ApiProductRepository("https://dummyjson.com");
+//const productRepository = new InMemoryProductRepository(data.products);
 
 // ---------- 2. Lógica de negocio ----------
 
@@ -66,7 +67,9 @@ const paginator = new Paginator({
 
 // ---------- 6. Eventos (se ponen una sola vez) ----------
 
-renderFilterForm("search-menu", shop.getCategories(), (filters) => {
+const categories  = await shop.getCategories();
+
+renderFilterForm("search-menu", categories.data, (filters) => {
     paginator.setParams(filters); // el paginador guarda los filtros y pide la página 1
 });
 

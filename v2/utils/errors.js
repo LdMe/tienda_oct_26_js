@@ -4,7 +4,13 @@ class NotAProductError extends Error {
         this.name = "NotAProductError";
     }
 }
-
+class FetchError extends Error {
+    constructor(response){
+        super("Error doing fetch: "+response.statusText);
+        this.name ="FetchError";
+        this.status = response.status;
+    }
+}
 class NotAClientError extends Error {
     constructor() {
         super("This is not a client");
@@ -38,5 +44,6 @@ export {
     NotAClientError,
     NotPositiveNumberError,
     ProductNotFoundError,
-    NotEnoughStockError
+    NotEnoughStockError,
+    FetchError
 }
